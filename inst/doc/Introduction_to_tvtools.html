@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>Introduction_to_tvtools</title>
+<style type="text/css">
+/**
+ * Prism.s theme ported from highlight.js's xcode style
+ */
+pre code {
+  padding: 1em;
+}
+.token.comment {
+  color: #007400;
+}
+.token.punctuation {
+  color: #999;
+}
+.token.tag,
+.token.selector {
+  color: #aa0d91;
+}
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol {
+  color: #1c00cf;
+}
+.token.property,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin {
+  color: #c41a16;
+}
+.token.inserted {
+  background-color: #ccffd8;
+}
+.token.deleted {
+  background-color: #ffebe9;
+}
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #9a6e3a;
+}
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #836c28;
+}
+.token.function,
+.token.class-name {
+  color: #DD4A68;
+}
+.token.regex,
+.token.important,
+.token.variable {
+  color: #5c2699;
+}
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+.token.italic {
+  font-style: italic;
+}
+</style>
+<style type="text/css">
+body {
+  font-family: sans-serif;
+  max-width: 800px;
+  margin: auto;
+  padding: 1em;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+body, .footnotes, code { font-size: .9em; }
+li li { font-size: .95em; }
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+pre, img { max-width: 100%; }
+pre, pre:hover {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+pre code {
+  display: block;
+  overflow-x: auto;
+}
+code { font-family: 'DejaVu Sans Mono', 'Droid Sans Mono', 'Lucida Console', Consolas, Monaco, monospace; }
+:not(pre) > code, code[class] { background-color: #F8F8F8; }
+code.language-undefined, pre > code:not([class]) {
+  background-color: inherit;
+  border: 1px solid #eee;
+}
+table {
+  margin: auto;
+  border-top: 1px solid #666;
+}
+table thead th { border-bottom: 1px solid #ddd; }
+th, td { padding: 5px; }
+thead, tfoot, tr:nth-child(even) { background: #eee; }
+blockquote {
+  color: #666;
+  margin: 0;
+  padding-left: 1em;
+  border-left: 0.5em solid #eee;
+}
+hr, .footnotes::before { border: 1px dashed #ddd; }
+.frontmatter { text-align: center; }
+#TOC .numbered li { list-style: none; }
+#TOC .numbered { padding-left: 0; }
+#TOC .numbered ul { padding-left: 1em; }
+table, .body h2 { border-bottom: 1px solid #666; }
+.body .appendix, .appendix ~ h2 { border-bottom-style: dashed; }
+.footnote-ref a::before { content: "["; }
+.footnote-ref a::after { content: "]"; }
+section.footnotes::before {
+  content: "";
+  display: block;
+  max-width: 20em;
+}
+
+@media print {
+  body {
+    font-size: 12pt;
+    max-width: 100%;
+  }
+  tr, img { page-break-inside: avoid; }
+}
+@media only screen and (min-width: 992px) {
+  pre { white-space: pre; }
+}
+</style>
+</head>
+<body>
+<div class="frontmatter">
+<div class="title"><h1>Introduction_to_tvtools</h1></div>
+<div class="author"><h2></h2></div>
+<div class="date"><h3></h3></div>
+</div>
+<div class="body">
+<h2 id="introduction">Introduction</h2>
+<p>Longitudinal data collected over a period of time can provide a view of a population’s changes.  Gathering and structuring longitudinal information may require a more flexible design for the data.  When a single subject’s records are updated at random intervals, and when the length of follow-up varies, a more complex data structure may be required.  <strong>Panel data</strong> provides one option for storing longitudinal records.  This structures information over intervals of time, with a variable number of records per subject.  While useful for storing data, the structure of panel data creates complexities in data analyses.  Calculations and models necessarily must account for the length of time.</p>
+<p>The <strong>tvtools</strong> package for R was published to simplify the process of exploring and analyzing panel data.  This vignette will provide an overview of panel data and introduce a range of methods.</p>
+<h2 id="sample-data">Sample Data</h2>
+<p>The tvtools package includes a sample data set called <strong>simulated.chd</strong>.  These fictional records were simulated based on a scenario of medical follow-up for patients with coronary heart disease (CHD).</p>
+<pre><code class="language-r">library(tvtools)
+library(data.table)
+library(DTwrappers)
+
+file_path &lt;- system.file(&quot;extdata&quot;, &quot;simulated_data.csv&quot;, package = &quot;tvtools&quot;)
+simulated.chd &lt;- fread(input = file_path)
+
+orig.data &lt;- copy(simulated.chd)
+</code></pre>
+<p>We can begin exploring the data by noting its dimensionality:</p>
+<pre><code class="language-r">dim(simulated.chd)
+#&gt; [1] 33572    13
+</code></pre>
+<p>The first ten rows of the simulated.chd data are:</p>
+<pre><code class="language-r">simulated.chd[1:10, ]
+#&gt;                   id    t1    t2   age    sex region
+#&gt;               &lt;char&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;char&gt; &lt;char&gt;
+#&gt;  1: 01KTl0KSK88EFV8N     0     8    69   Male   West
+#&gt;  2: 01KTl0KSK88EFV8N     8    30    69   Male   West
+#&gt;  3: 01KTl0KSK88EFV8N    30    38    69   Male   West
+#&gt;  4: 01KTl0KSK88EFV8N    38    46    69   Male   West
+#&gt;  5: 01KTl0KSK88EFV8N    46    66    69   Male   West
+#&gt;  6: 01KTl0KSK88EFV8N    66    90    69   Male   West
+#&gt;  7: 01KTl0KSK88EFV8N    90    94    69   Male   West
+#&gt;  8: 01KTl0KSK88EFV8N    94   110    69   Male   West
+#&gt;  9: 01KTl0KSK88EFV8N   110   124    69   Male   West
+#&gt; 10: 01KTl0KSK88EFV8N   124   133    69   Male   West
+#&gt;                       baseline.condition diabetes   ace    bb statin hospital
+#&gt;                                   &lt;char&gt;    &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;    &lt;int&gt;
+#&gt;  1: moderate symptoms or light procedure        0     1     0      1        0
+#&gt;  2: moderate symptoms or light procedure        0     1     1      1        0
+#&gt;  3: moderate symptoms or light procedure        0     1     1      0        0
+#&gt;  4: moderate symptoms or light procedure        0     1     0      0        0
+#&gt;  5: moderate symptoms or light procedure        0     1     1      0        0
+#&gt;  6: moderate symptoms or light procedure        0     1     1      1        0
+#&gt;  7: moderate symptoms or light procedure        0     0     1      1        0
+#&gt;  8: moderate symptoms or light procedure        0     1     1      1        0
+#&gt;  9: moderate symptoms or light procedure        0     1     0      1        0
+#&gt; 10: moderate symptoms or light procedure        0     0     0      1        0
+#&gt;     death
+#&gt;     &lt;int&gt;
+#&gt;  1:     0
+#&gt;  2:     0
+#&gt;  3:     0
+#&gt;  4:     0
+#&gt;  5:     0
+#&gt;  6:     0
+#&gt;  7:     0
+#&gt;  8:     0
+#&gt;  9:     0
+#&gt; 10:     0
+</code></pre>
+<p>Here we see a partial view of the records for a single patient with id 01KTl0KSK88EFV8N.  The variables t1 and t2 represent a time interval for the record.  This will be discussed further in the section on the structure of panel data.  The patient’s age at diagnosis, sex, geographic region, baseline condition, and diabetes status are provided.  The variables ace (ace inhibitor), bb (beta blocker), and statin provide records of the possession of common prescription medications for patients with CHD.  The patient’s admissions to the hospital are recorded, and the death variable is used to identify cases of mortality.  The medications, hospital status, and mortality of the patient can change over time.  These will also be discussed further.</p>
+<p>The simulated data include records on many patients.  For instance, a portion of the recods for several patients are shown below:</p>
+<pre><code class="language-r">simulated.chd[58:70, ]
+#&gt;                   id    t1    t2   age    sex    region
+#&gt;               &lt;char&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;char&gt;    &lt;char&gt;
+#&gt;  1: 01ZbYuUoYJeIyiVH     0     1    61   Male Northeast
+#&gt;  2: 01ZbYuUoYJeIyiVH     1    10    61   Male Northeast
+#&gt;  3: 01ZbYuUoYJeIyiVH    10    30    61   Male Northeast
+#&gt;  4: 01ZbYuUoYJeIyiVH    30    31    61   Male Northeast
+#&gt;  5: 01ZbYuUoYJeIyiVH    31    43    61   Male Northeast
+#&gt;  6: 01ZbYuUoYJeIyiVH    43    70    61   Male Northeast
+#&gt;  7: 01ZbYuUoYJeIyiVH    70    70    61   Male Northeast
+#&gt;  8: 01oLxxu87rRDCIvo     0    34    63   Male   Midwest
+#&gt;  9: 01oLxxu87rRDCIvo    34    61    63   Male   Midwest
+#&gt; 10: 01oLxxu87rRDCIvo    61    64    63   Male   Midwest
+#&gt; 11: 01oLxxu87rRDCIvo    64    64    63   Male   Midwest
+#&gt; 12: 01rOm5qEH4GLCiL5     0     1    62   Male   Midwest
+#&gt; 13: 01rOm5qEH4GLCiL5     1    90    62   Male   Midwest
+#&gt;                       baseline.condition diabetes   ace    bb statin hospital
+#&gt;                                   &lt;char&gt;    &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;    &lt;int&gt;
+#&gt;  1:      Major heart attack or operation        0     0     0      0        0
+#&gt;  2:      Major heart attack or operation        0     1     0      0        0
+#&gt;  3:      Major heart attack or operation        0     1     1      0        0
+#&gt;  4:      Major heart attack or operation        0     1     1      1        0
+#&gt;  5:      Major heart attack or operation        0     0     1      1        0
+#&gt;  6:      Major heart attack or operation        0     0     1      1        1
+#&gt;  7:      Major heart attack or operation        0     0     1      1        1
+#&gt;  8: moderate symptoms or light procedure        0     1     1      1        0
+#&gt;  9: moderate symptoms or light procedure        0     1     1      1        0
+#&gt; 10: moderate symptoms or light procedure        0     1     1      1        0
+#&gt; 11: moderate symptoms or light procedure        0     0     0      0        0
+#&gt; 12:      Major heart attack or operation        0     1     1      1        0
+#&gt; 13:      Major heart attack or operation        0     1     1      1        0
+#&gt;     death
+#&gt;     &lt;int&gt;
+#&gt;  1:     0
+#&gt;  2:     0
+#&gt;  3:     0
+#&gt;  4:     0
+#&gt;  5:     0
+#&gt;  6:     0
+#&gt;  7:     1
+#&gt;  8:     0
+#&gt;  9:     0
+#&gt; 10:     0
+#&gt; 11:     0
+#&gt; 12:     0
+#&gt; 13:     0
+</code></pre>
+<h2 id="structure-of-panel-data">Structure of Panel Data</h2>
+<p>We can now more carefully define the elements of panel data.  Some necessary variables include the:</p>
+<ul>
+<li>
+<p><strong>subject identifier</strong>:  This uniquely identifies a subject so that records across multiple rows can be linked.</p>
+</li>
+<li>
+<p><strong>time interval</strong>:  This records a period of time [t1, t2) during which the record is observed.  In particular, panel data assumes that a) the values of the record <strong>take effect at time t1</strong>, and b) the values <strong>remain constant</strong> from time t1 to time t2.  It is important for the time intervals in a subject’s different rows to be mutually exclusive.</p>
+</li>
+<li>
+<p><strong>constant variables</strong>:  These values appear in a patient’s records but cannot change.  For instance, a patient’s age at the time of the first diagnosis of CHD would not vary across the records in follow-up.  Important baseline factors, such as a history of comorbid medical conditions, might also be included as constant variables.</p>
+</li>
+<li>
+<p><strong>time-varying variables</strong>:  These values can change over time.  Records of a patient’s weight, laboratory tests, medication usage, and hospitalization status are all examples of time-varying variables.  Medical outcomes such as medication adherence or the costs of hospitalization can often be the basis of considerable study.  Time-varying data could reasonably illustrate a period during which a medical patient is adherent to a medication or the duration of a hospital admission.  However, acute events such as a heart attack are necessarily not long lasting.  Ideally a panel would be structured to update the record at a time shortly after the event.  In some cases, interpretation of the panel is required.  For instance, a lengthy interval that begins with a heart attack would require recognition that the event did not last for the entire duration.  Likewise, if an event such as mortality is observed during a lengthy interval, the panel should be restructured with a new record marking the death after that previous interval.  Because of these intricacies, additional attention to the details can be required.  A practitioner should be careful to properly interpret the events recorded in panel data and to ensure their quality.</p>
+</li>
+</ul>
+<p>To better examine these issues, we will consider the first few rows of the simulated.chd data:</p>
+<pre><code class="language-r">simulated.chd[1:3, ]
+#&gt;                  id    t1    t2   age    sex region
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;char&gt; &lt;char&gt;
+#&gt; 1: 01KTl0KSK88EFV8N     0     8    69   Male   West
+#&gt; 2: 01KTl0KSK88EFV8N     8    30    69   Male   West
+#&gt; 3: 01KTl0KSK88EFV8N    30    38    69   Male   West
+#&gt;                      baseline.condition diabetes   ace    bb statin hospital
+#&gt;                                  &lt;char&gt;    &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;    &lt;int&gt;
+#&gt; 1: moderate symptoms or light procedure        0     1     0      1        0
+#&gt; 2: moderate symptoms or light procedure        0     1     1      1        0
+#&gt; 3: moderate symptoms or light procedure        0     1     1      0        0
+#&gt;    death
+#&gt;    &lt;int&gt;
+#&gt; 1:     0
+#&gt; 2:     0
+#&gt; 3:     0
+</code></pre>
+<p>This illustrates a short period of follow-up for a patient.  The first row begins with t1 = 0, the moment of the patient’s initial diagnosis of CHD.  The patient is 69 years old, male, and living in the west.  CHD was diagnosed from a baseline condition that included moderate symptoms or a light procedure.  The patient did not have diabetes.  At the beginning of the interval (t1 = 0), the patient possessed ace inhibitors (ace = 1) and statin medications (statin = 1).  The patient did not possess a beta blocker (bb = 0).  The patient was also not admitted to the hospital (hospital = 0) and was alive (death = 0).  This state of affairs was assumed to persist for 8 days, until the end of the first interval (t2 = 8).  Then a new record (the second row) was entered.  It is certainly possible for an update to include no changes to the time-varying records.  However, an efficient panel structure would only generate new records when updates occur.  In this case, the patient filled a prescription for a beta blocker (bb = 1) at time t1 = 8 days.  The patient was then on all three medications (ace = 1, bb = 1, statin = 1) with no hospitalizations (hospital = 0) and while remaining alive (death = 0).  A third row was generated at day t1 = 30.  In this case, the patient no longer possessed a statin medication (statin = 0), while the previous row’s other factors remained fixed.  This record was maintained for 8 days (t2 = 38).  Generalizing to all of the records for a single patient, the panel presents a historical record of the patient’s condition.  The full set of panel data then presents the recorded histories for all of the patients.  Each patient is followed from their moment of diagnosis until death or a loss of follow-up.</p>
+<h2 id="sorting">Sorting</h2>
+<p>For most applications, structuring panel data in sorted order can simplify the subsequent analyses.  The <strong>structure.panel</strong> method is used to sort by the subject’s identifier and beginning time interval.</p>
+<pre><code class="language-r">simulated.chd &lt;- structure.panel(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;)
+
+simulated.chd[1:3, ]
+#&gt;                  id    t1    t2   age    sex region
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;char&gt; &lt;char&gt;
+#&gt; 1: 01KTl0KSK88EFV8N     0     8    69   Male   West
+#&gt; 2: 01KTl0KSK88EFV8N     8    30    69   Male   West
+#&gt; 3: 01KTl0KSK88EFV8N    30    38    69   Male   West
+#&gt;                      baseline.condition diabetes   ace    bb statin hospital
+#&gt;                                  &lt;char&gt;    &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;    &lt;int&gt;
+#&gt; 1: moderate symptoms or light procedure        0     1     0      1        0
+#&gt; 2: moderate symptoms or light procedure        0     1     1      1        0
+#&gt; 3: moderate symptoms or light procedure        0     1     1      0        0
+#&gt;    death
+#&gt;    &lt;int&gt;
+#&gt; 1:     0
+#&gt; 2:     0
+#&gt; 3:     0
+</code></pre>
+<p>As an additional example, we’ll show how an unsorted panel data set can be reordered:</p>
+<pre><code class="language-r">structure.panel(dat = simulated.chd[c(2, 4, 3, 1), ])
+#&gt;                  id    t1    t2   age    sex region
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;char&gt; &lt;char&gt;
+#&gt; 1: 01KTl0KSK88EFV8N     0     8    69   Male   West
+#&gt; 2: 01KTl0KSK88EFV8N     8    30    69   Male   West
+#&gt; 3: 01KTl0KSK88EFV8N    30    38    69   Male   West
+#&gt; 4: 01KTl0KSK88EFV8N    38    46    69   Male   West
+#&gt;                      baseline.condition diabetes   ace    bb statin hospital
+#&gt;                                  &lt;char&gt;    &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;    &lt;int&gt;
+#&gt; 1: moderate symptoms or light procedure        0     1     0      1        0
+#&gt; 2: moderate symptoms or light procedure        0     1     1      1        0
+#&gt; 3: moderate symptoms or light procedure        0     1     1      0        0
+#&gt; 4: moderate symptoms or light procedure        0     1     0      0        0
+#&gt;    death
+#&gt;    &lt;int&gt;
+#&gt; 1:     0
+#&gt; 2:     0
+#&gt; 3:     0
+#&gt; 4:     0
+</code></pre>
+<h2 id="methods">Methods</h2>
+<p>The tvtools package is designed to facilitate a range of methods to explore and analyze panel data.  These include summarization techniques, methods of calculation, and quality checks.</p>
+<h3 id="summarization">Summarization</h3>
+<p>The <strong>summarize.panel</strong> function is designed to provide a simple summary of a panel data structure.  The column name for the subject’s unique identifier is specified to calculate the number of subjects and the mean records per subject.  The column names for the time intervals help to gain a sense of the amount of follow-up time observed in the data.</p>
+<pre><code class="language-r">summarize.panel(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;)
+#&gt;    total.records unique.ids mean.records.per.id total.followup max.followup
+#&gt;            &lt;int&gt;      &lt;int&gt;               &lt;num&gt;          &lt;int&gt;        &lt;int&gt;
+#&gt; 1:         33572       1000              33.572         722772         2606
+</code></pre>
+<p>This summary can also be produced in subgroups by specifying one or more categorical grouping variables:</p>
+<pre><code class="language-r">summarize.panel(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;,
+    grouping.variables = &quot;sex&quot;)
+#&gt; Key: &lt;sex&gt;
+#&gt;       sex total.records unique.ids mean.records.per.id total.followup
+#&gt;    &lt;char&gt;         &lt;int&gt;      &lt;int&gt;               &lt;num&gt;          &lt;int&gt;
+#&gt; 1: Female         16592        487            34.06982         358387
+#&gt; 2:   Male         16980        513            33.09942         364385
+#&gt;    max.followup
+#&gt;           &lt;int&gt;
+#&gt; 1:         2606
+#&gt; 2:         2602
+</code></pre>
+<pre><code class="language-r">
+summarize.panel(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;,
+    grouping.variables = c(&quot;sex&quot;, &quot;region&quot;))
+#&gt; Key: &lt;sex, region&gt;
+#&gt;       sex    region total.records unique.ids mean.records.per.id total.followup
+#&gt;    &lt;char&gt;    &lt;char&gt;         &lt;int&gt;      &lt;int&gt;               &lt;num&gt;          &lt;int&gt;
+#&gt; 1: Female   Midwest          3063         93            32.93548          68463
+#&gt; 2: Female Northeast          5237        134            39.08209         108336
+#&gt; 3: Female     South          2796         93            30.06452          61332
+#&gt; 4: Female      West          5496        167            32.91018         120256
+#&gt; 5:   Male   Midwest          3108         98            31.71429          68222
+#&gt; 6:   Male Northeast          5074        160            31.71250         112672
+#&gt; 7:   Male     South          3699        103            35.91262          76110
+#&gt; 8:   Male      West          5099        152            33.54605         107381
+#&gt;    max.followup
+#&gt;           &lt;int&gt;
+#&gt; 1:         2606
+#&gt; 2:         2601
+#&gt; 3:         2567
+#&gt; 4:         2496
+#&gt; 5:         2564
+#&gt; 6:         2498
+#&gt; 7:         2569
+#&gt; 8:         2602
+</code></pre>
+<h3 id="follow-up-time-calculations">Follow-Up Time Calculations</h3>
+<p>The length of follow-up time can be a critical factor in the study’s analytical judgments and selected methods.  In some applications, one might choose to only include patients who completed at least 1 year of observation or to ensure that the median length of follow-up is sufficient for the goals of the study.</p>
+<p>The followup.time function calculates the length of observation for each patient.  This may be performed in two separate ways:</p>
+<ul>
+<li>
+<p><strong>Max Follow-Up</strong>:  Calculate the last observed time for each subject.</p>
+</li>
+<li>
+<p><strong>Total Follow-Up</strong>:  Calculate the overall amount of observed time for each subject.  This has the effect of removing missing time intervals or including reference points other than time zero.</p>
+</li>
+</ul>
+<p>On the simulated.chd data, we can calculate the maximum follow-up time for each subject:</p>
+<pre><code class="language-r">followup.time(dat = simulated.chd, id.name = &quot;id&quot;, t2.name = &quot;t2&quot;, calculate.as = &quot;max&quot;)
+#&gt;                     id followup.time
+#&gt;                 &lt;char&gt;         &lt;int&gt;
+#&gt;    1: 01KTl0KSK88EFV8N          1075
+#&gt;    2: 01ZbYuUoYJeIyiVH            70
+#&gt;    3: 01oLxxu87rRDCIvo            64
+#&gt;    4: 01rOm5qEH4GLCiL5          2389
+#&gt;    5: 021eg6OjCoGotbXK            95
+#&gt;   ---                               
+#&gt;  996: zm1gtU2uw866RDGy           127
+#&gt;  997: zqMNWR16s2XrWiYJ          1463
+#&gt;  998: zs7NTtHeWTecHvxS           813
+#&gt;  999: ztSPQ3OMBA2CzgSp           255
+#&gt; 1000: zxOx9moOQBqSiKq2            63
+</code></pre>
+<p>Likewise, shifting to the total follow-up also leads to the same results.</p>
+<pre><code class="language-r">followup.time(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;,
+    calculate.as = &quot;total&quot;)
+#&gt;                     id followup.time
+#&gt;                 &lt;char&gt;         &lt;int&gt;
+#&gt;    1: 01KTl0KSK88EFV8N          1075
+#&gt;    2: 01ZbYuUoYJeIyiVH            70
+#&gt;    3: 01oLxxu87rRDCIvo            64
+#&gt;    4: 01rOm5qEH4GLCiL5          2389
+#&gt;    5: 021eg6OjCoGotbXK            95
+#&gt;   ---                               
+#&gt;  996: zm1gtU2uw866RDGy           127
+#&gt;  997: zqMNWR16s2XrWiYJ          1463
+#&gt;  998: zs7NTtHeWTecHvxS           813
+#&gt;  999: ztSPQ3OMBA2CzgSp           255
+#&gt; 1000: zxOx9moOQBqSiKq2            63
+</code></pre>
+<p>This is true because the simulated.chd data begins at a baseline of t1 = 0 for each patient and does not include any missing time intervals over the length of any patient’s observation.</p>
+<p>The followup.time method can be applied to all or a subset of a single subject’s records.  Let’s consider the case of one patient from the simulated.chd data:</p>
+<pre><code class="language-r">followup.time(dat = simulated.chd[id == id[1], ], id.name = &quot;id&quot;, t1.name = &quot;t1&quot;,
+    t2.name = &quot;t2&quot;, calculate.as = &quot;total&quot;)
+#&gt;                  id followup.time
+#&gt;              &lt;char&gt;         &lt;int&gt;
+#&gt; 1: 01KTl0KSK88EFV8N          1075
+</code></pre>
+<pre><code class="language-r">followup.time(dat = simulated.chd[id == id[1], ][5:20, ], id.name = &quot;id&quot;, t1.name = &quot;t1&quot;,
+    t2.name = &quot;t2&quot;, calculate.as = &quot;total&quot;)
+#&gt;                  id followup.time
+#&gt;              &lt;char&gt;         &lt;int&gt;
+#&gt; 1: 01KTl0KSK88EFV8N           195
+</code></pre>
+<pre><code class="language-r">followup.time(dat = simulated.chd[id == id[1], ][5:20, ], id.name = &quot;id&quot;, t1.name = &quot;t1&quot;,
+    t2.name = &quot;t2&quot;, calculate.as = &quot;max&quot;)
+#&gt;                  id followup.time
+#&gt;              &lt;char&gt;         &lt;int&gt;
+#&gt; 1: 01KTl0KSK88EFV8N           241
+</code></pre>
+<p>These calculations show that the patient was followed for a total of 1075 days.  The records from the subject’s 5th to 20th records encompass a total of 195 days, with day 241 as the latest in this period.</p>
+<p>The followup times can also be appended to the original data set with a user-selected name for the new column:</p>
+<pre><code class="language-r">followup.time(dat = simulated.chd, id.name = &quot;id&quot;, t2.name = &quot;t2&quot;, calculate.as = &quot;max&quot;,
+    append.to.data = T, followup.name = &quot;followup.time&quot;)
+print(simulated.chd[1:5, ])
+#&gt;                  id    t1    t2   age    sex region
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;char&gt; &lt;char&gt;
+#&gt; 1: 01KTl0KSK88EFV8N     0     8    69   Male   West
+#&gt; 2: 01KTl0KSK88EFV8N     8    30    69   Male   West
+#&gt; 3: 01KTl0KSK88EFV8N    30    38    69   Male   West
+#&gt; 4: 01KTl0KSK88EFV8N    38    46    69   Male   West
+#&gt; 5: 01KTl0KSK88EFV8N    46    66    69   Male   West
+#&gt;                      baseline.condition diabetes   ace    bb statin hospital
+#&gt;                                  &lt;char&gt;    &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;    &lt;int&gt;
+#&gt; 1: moderate symptoms or light procedure        0     1     0      1        0
+#&gt; 2: moderate symptoms or light procedure        0     1     1      1        0
+#&gt; 3: moderate symptoms or light procedure        0     1     1      0        0
+#&gt; 4: moderate symptoms or light procedure        0     1     0      0        0
+#&gt; 5: moderate symptoms or light procedure        0     1     1      0        0
+#&gt;    death followup.time
+#&gt;    &lt;int&gt;         &lt;int&gt;
+#&gt; 1:     0          1075
+#&gt; 2:     0          1075
+#&gt; 3:     0          1075
+#&gt; 4:     0          1075
+#&gt; 5:     0          1075
+</code></pre>
+<h2 id="measuring-the-time-to-events">Measuring the Time to Events</h2>
+<p>Outcome variables such as survival times may be calculated from panel data by identifying the time of an event.  The <strong>first.event</strong> method is designed to facilitate these calculations on a collection of outcome variables.  By specifying the identifier, we can perform the calculation separately on each subject in the data set.  In the first example, we calculate the initiation times of the three medicines – the times at which a presciption for each medicine was first filled by the patient.</p>
+<pre><code class="language-r">first.event(dat = simulated.chd, id.name = &quot;id&quot;, outcome.names = c(&quot;ace&quot;, &quot;bb&quot;, &quot;statin&quot;),
+    t1.name = &quot;t1&quot;)
+#&gt;                     id ace.first.event bb.first.event statin.first.event
+#&gt;                 &lt;char&gt;           &lt;int&gt;          &lt;int&gt;              &lt;int&gt;
+#&gt;    1: 01KTl0KSK88EFV8N               0              8                  0
+#&gt;    2: 01ZbYuUoYJeIyiVH               1             10                 30
+#&gt;    3: 01oLxxu87rRDCIvo               0              0                  0
+#&gt;    4: 01rOm5qEH4GLCiL5               0              0                  0
+#&gt;    5: 021eg6OjCoGotbXK               1             33                  0
+#&gt;   ---                                                                   
+#&gt;  996: zm1gtU2uw866RDGy               0              0                  1
+#&gt;  997: zqMNWR16s2XrWiYJ             220              0                  0
+#&gt;  998: zs7NTtHeWTecHvxS               0              7                  0
+#&gt;  999: ztSPQ3OMBA2CzgSp              73             35                  4
+#&gt; 1000: zxOx9moOQBqSiKq2               0              0                  1
+</code></pre>
+<p>Likewise, we can calculate the time to a first hospitalization or mortality.  Note that NA values are displayed for patients who were not hospitalized and also for those who survived for the period of follow-up.</p>
+<pre><code class="language-r">first.event(dat = simulated.chd, id.name = &quot;id&quot;, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;),
+    t1.name = &quot;t1&quot;)
+#&gt;                     id hospital.first.event death.first.event
+#&gt;                 &lt;char&gt;                &lt;int&gt;             &lt;int&gt;
+#&gt;    1: 01KTl0KSK88EFV8N                   NA                NA
+#&gt;    2: 01ZbYuUoYJeIyiVH                   43                70
+#&gt;    3: 01oLxxu87rRDCIvo                   NA                NA
+#&gt;    4: 01rOm5qEH4GLCiL5                  100                NA
+#&gt;    5: 021eg6OjCoGotbXK                   NA                NA
+#&gt;   ---                                                        
+#&gt;  996: zm1gtU2uw866RDGy                   NA                NA
+#&gt;  997: zqMNWR16s2XrWiYJ                    0                NA
+#&gt;  998: zs7NTtHeWTecHvxS                   NA                NA
+#&gt;  999: ztSPQ3OMBA2CzgSp                  255                NA
+#&gt; 1000: zxOx9moOQBqSiKq2                   NA                NA
+</code></pre>
+<p>These times to a first event can also be calculated on the entire population by setting id.name = NULL:</p>
+<pre><code class="language-r">## first.event(dat = simulated.chd, id.name = NULL, outcome.names =
+## c('hospital', 'death'), t1.name = 't1')
+</code></pre>
+<p>These calculated quantities can also be appended to the data set:</p>
+<pre><code class="language-r">one.patient &lt;- first.event(dat = simulated.chd[id == &quot;01ZbYuUoYJeIyiVH&quot;, ], id.name = &quot;id&quot;,
+    outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), t1.name = &quot;t1&quot;, append.to.table = TRUE,
+    event.name = &quot;time&quot;)
+setorderv(x = one.patient, cols = c(&quot;id&quot;, &quot;t1&quot;))
+print(one.patient)
+#&gt; Key: &lt;id&gt;
+#&gt;                  id    t1    t2   age    sex    region
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;char&gt;    &lt;char&gt;
+#&gt; 1: 01ZbYuUoYJeIyiVH     0     1    61   Male Northeast
+#&gt; 2: 01ZbYuUoYJeIyiVH     1    10    61   Male Northeast
+#&gt; 3: 01ZbYuUoYJeIyiVH    10    30    61   Male Northeast
+#&gt; 4: 01ZbYuUoYJeIyiVH    30    31    61   Male Northeast
+#&gt; 5: 01ZbYuUoYJeIyiVH    31    43    61   Male Northeast
+#&gt; 6: 01ZbYuUoYJeIyiVH    43    70    61   Male Northeast
+#&gt; 7: 01ZbYuUoYJeIyiVH    70    70    61   Male Northeast
+#&gt;                 baseline.condition diabetes   ace    bb statin hospital death
+#&gt;                             &lt;char&gt;    &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;    &lt;int&gt; &lt;int&gt;
+#&gt; 1: Major heart attack or operation        0     0     0      0        0     0
+#&gt; 2: Major heart attack or operation        0     1     0      0        0     0
+#&gt; 3: Major heart attack or operation        0     1     1      0        0     0
+#&gt; 4: Major heart attack or operation        0     1     1      1        0     0
+#&gt; 5: Major heart attack or operation        0     0     1      1        0     0
+#&gt; 6: Major heart attack or operation        0     0     1      1        1     0
+#&gt; 7: Major heart attack or operation        0     0     1      1        1     1
+#&gt;    followup.time hospital.time death.time
+#&gt;            &lt;int&gt;         &lt;int&gt;      &lt;int&gt;
+#&gt; 1:            70            43         70
+#&gt; 2:            70            43         70
+#&gt; 3:            70            43         70
+#&gt; 4:            70            43         70
+#&gt; 5:            70            43         70
+#&gt; 6:            70            43         70
+#&gt; 7:            70            43         70
+</code></pre>
+<p>Similarly, the <strong>last.event</strong> method, designed with similar inputs, is used to find the last time at which an event occurs:</p>
+<pre><code class="language-r">last.event(dat = simulated.chd, id.name = &quot;id&quot;, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;),
+    t1.name = &quot;t1&quot;)[1:5, ]
+#&gt;                  id hospital.last.event death.last.event
+#&gt;              &lt;char&gt;               &lt;int&gt;            &lt;int&gt;
+#&gt; 1: 01KTl0KSK88EFV8N                  NA               NA
+#&gt; 2: 01ZbYuUoYJeIyiVH                  70               70
+#&gt; 3: 01oLxxu87rRDCIvo                  NA               NA
+#&gt; 4: 01rOm5qEH4GLCiL5                2039               NA
+#&gt; 5: 021eg6OjCoGotbXK                  NA               NA
+</code></pre>
+<p>If the end of an interval is preferred, the t2 column may be substituted:</p>
+<pre><code class="language-r">last.event(dat = simulated.chd, id.name = NULL, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;),
+    t1.name = &quot;t2&quot;)[1:5, ]
+#&gt;    hospital.last.event death.last.event
+#&gt;                  &lt;int&gt;            &lt;int&gt;
+#&gt; 1:                2606             2564
+#&gt; 2:                  NA               NA
+#&gt; 3:                  NA               NA
+#&gt; 4:                  NA               NA
+#&gt; 5:                  NA               NA
+</code></pre>
+<p>The last.event method is especially helpful when looking across the sample for the latest events:</p>
+<pre><code class="language-r">last.event(dat = simulated.chd, id.name = NULL, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;),
+    t1.name = &quot;t1&quot;)
+#&gt;    hospital.last.event death.last.event
+#&gt;                  &lt;int&gt;            &lt;int&gt;
+#&gt; 1:                2606             2564
+</code></pre>
+<h2 id="cross-sectional-data">Cross-Sectional Data</h2>
+<p>Panel data differs from more standard data in terms of its structure and variability of longitudinal observation.  Being able to convert the panel to a more traditional form can facilitate a range of analyses.  In order to do so, we must consider the:</p>
+<ul>
+<li>
+<p><strong>Baseline Factors</strong>:  These would be measurements recorded at the time of the study’s baseline.</p>
+</li>
+<li>
+<p><strong>Outcomes</strong>:  These would measure the time to a subject’s first event relative to the baseline.</p>
+</li>
+</ul>
+<p>The <strong>cross.sectional.data</strong> method converts panel data into this standard form, with one row per subject.  Baseline measurements are recorded as of the specified time, while outcomes are measured as the time to the first occurrence of the event (or NA if not observed).  The subject’s overall length of follow-up is also calculated to enable survival analyses of censored data.  We can specify the time.point as 0 to conduct the study from the beginning of the period of observation:</p>
+<pre><code class="language-r">simulated.chd[, followup.time := NULL]
+</code></pre>
+<pre><code class="language-r">baseline &lt;- cross.sectional.data(dat = simulated.chd, time.point = 0, id.name = &quot;id&quot;,
+    t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;))
+baseline[1, ]
+#&gt; Key: &lt;id&gt;
+#&gt;                  id   age    sex region                   baseline.condition
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;char&gt; &lt;char&gt;                               &lt;char&gt;
+#&gt; 1: 01KTl0KSK88EFV8N    69   Male   West moderate symptoms or light procedure
+#&gt;    diabetes   ace    bb statin hospital.first.event death.first.event
+#&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;                &lt;int&gt;             &lt;int&gt;
+#&gt; 1:        0     1     0      1                   NA                NA
+#&gt;    followup.time cross.sectional.time
+#&gt;            &lt;int&gt;                &lt;num&gt;
+#&gt; 1:          1075                    0
+</code></pre>
+<pre><code class="language-r">baseline[hospital.first.event &gt; 0, ][1:2, ]
+#&gt; Key: &lt;id&gt;
+#&gt;                  id   age    sex    region              baseline.condition
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;char&gt;    &lt;char&gt;                          &lt;char&gt;
+#&gt; 1: 01ZbYuUoYJeIyiVH    61   Male Northeast Major heart attack or operation
+#&gt; 2: 01rOm5qEH4GLCiL5    62   Male   Midwest Major heart attack or operation
+#&gt;    diabetes   ace    bb statin hospital.first.event death.first.event
+#&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;                &lt;int&gt;             &lt;int&gt;
+#&gt; 1:        0     0     0      0                   43                70
+#&gt; 2:        0     1     1      1                  100                NA
+#&gt;    followup.time cross.sectional.time
+#&gt;            &lt;int&gt;                &lt;num&gt;
+#&gt; 1:            70                    0
+#&gt; 2:          2389                    0
+</code></pre>
+<pre><code class="language-r">baseline[death.first.event &gt; 0, ][1:2, ]
+#&gt; Key: &lt;id&gt;
+#&gt;                  id   age    sex    region              baseline.condition
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;char&gt;    &lt;char&gt;                          &lt;char&gt;
+#&gt; 1: 01ZbYuUoYJeIyiVH    61   Male Northeast Major heart attack or operation
+#&gt; 2: 0bt4Duak3aWCPO7E    71   Male   Midwest Major heart attack or operation
+#&gt;    diabetes   ace    bb statin hospital.first.event death.first.event
+#&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;                &lt;int&gt;             &lt;int&gt;
+#&gt; 1:        0     0     0      0                   43                70
+#&gt; 2:        0     0     0      1                    0              2564
+#&gt;    followup.time cross.sectional.time
+#&gt;            &lt;int&gt;                &lt;num&gt;
+#&gt; 1:            70                    0
+#&gt; 2:          2564                    0
+</code></pre>
+<p>The <strong>create.baseline</strong> method is a light wrapper of <strong>cross.sectional.data</strong> that forces the time point to 0:</p>
+<pre><code class="language-r">baseline.2 &lt;- create.baseline(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;,
+    t2.name = &quot;t2&quot;, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;))
+baseline.2[hospital.first.event &gt; 0, ][1:2, ]
+#&gt; Key: &lt;id&gt;
+#&gt;                  id   age    sex    region              baseline.condition
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;char&gt;    &lt;char&gt;                          &lt;char&gt;
+#&gt; 1: 01ZbYuUoYJeIyiVH    61   Male Northeast Major heart attack or operation
+#&gt; 2: 01rOm5qEH4GLCiL5    62   Male   Midwest Major heart attack or operation
+#&gt;    diabetes   ace    bb statin hospital.first.event death.first.event
+#&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;                &lt;int&gt;             &lt;int&gt;
+#&gt; 1:        0     0     0      0                   43                70
+#&gt; 2:        0     1     1      1                  100                NA
+#&gt;    followup.time cross.sectional.time
+#&gt;            &lt;int&gt;                &lt;num&gt;
+#&gt; 1:            70                    0
+#&gt; 2:          2389                    0
+</code></pre>
+<pre><code class="language-r">baseline.2[death.first.event &gt; 0, ][1:2, ]
+#&gt; Key: &lt;id&gt;
+#&gt;                  id   age    sex    region              baseline.condition
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;char&gt;    &lt;char&gt;                          &lt;char&gt;
+#&gt; 1: 01ZbYuUoYJeIyiVH    61   Male Northeast Major heart attack or operation
+#&gt; 2: 0bt4Duak3aWCPO7E    71   Male   Midwest Major heart attack or operation
+#&gt;    diabetes   ace    bb statin hospital.first.event death.first.event
+#&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;                &lt;int&gt;             &lt;int&gt;
+#&gt; 1:        0     0     0      0                   43                70
+#&gt; 2:        0     0     0      1                    0              2564
+#&gt;    followup.time cross.sectional.time
+#&gt;            &lt;int&gt;                &lt;num&gt;
+#&gt; 1:            70                    0
+#&gt; 2:          2564                    0
+</code></pre>
+<p>A cross-sectional data set can also be produced at later times.  In these settings, the time to the first event only includes events that occur at or after the cross-sectional time point.  By specifying relative.followup = FALSE, the event times and length of follow-up are recorded in absolute terms (relative to time zero rather than the cross-sectional baseline).</p>
+<pre><code class="language-r">cs.365 &lt;- cross.sectional.data(dat = simulated.chd, time.point = 365, id.name = &quot;id&quot;,
+    t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), relative.followup = FALSE)
+cs.365[1:2, ]
+#&gt; Key: &lt;id&gt;
+#&gt;                  id   age    sex  region                   baseline.condition
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;char&gt;  &lt;char&gt;                               &lt;char&gt;
+#&gt; 1: 01KTl0KSK88EFV8N    69   Male    West moderate symptoms or light procedure
+#&gt; 2: 01rOm5qEH4GLCiL5    62   Male Midwest      Major heart attack or operation
+#&gt;    diabetes   ace    bb statin hospital.first.event death.first.event
+#&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;                &lt;int&gt;             &lt;int&gt;
+#&gt; 1:        0     1     1      1                   NA                NA
+#&gt; 2:        0     1     1      1                  561                NA
+#&gt;    followup.time cross.sectional.time
+#&gt;            &lt;int&gt;                &lt;num&gt;
+#&gt; 1:          1075                  365
+#&gt; 2:          2389                  365
+</code></pre>
+<p>Alternatively, we can specify relative.followup = TRUE to calculate the event and followup times after the cross-sectional baseline.</p>
+<pre><code class="language-r">cs.365.relative &lt;- cross.sectional.data(dat = simulated.chd, time.point = 365, id.name = &quot;id&quot;,
+    t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), relative.followup = TRUE)
+cs.365.relative[1:2, ]
+#&gt; Key: &lt;id&gt;
+#&gt;                  id   age    sex  region                   baseline.condition
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;char&gt;  &lt;char&gt;                               &lt;char&gt;
+#&gt; 1: 01KTl0KSK88EFV8N    69   Male    West moderate symptoms or light procedure
+#&gt; 2: 01rOm5qEH4GLCiL5    62   Male Midwest      Major heart attack or operation
+#&gt;    diabetes   ace    bb statin hospital.first.event death.first.event
+#&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;                &lt;num&gt;             &lt;num&gt;
+#&gt; 1:        0     1     1      1                   NA                NA
+#&gt; 2:        0     1     1      1                  196                NA
+#&gt;    followup.time cross.sectional.time
+#&gt;            &lt;num&gt;                &lt;num&gt;
+#&gt; 1:           710                  365
+#&gt; 2:          2024                  365
+</code></pre>
+<p>It is also possible to create a purely cross-sectional data set with no outcome measurements by setting outcome.names = NULL.  Then all of the measurements will be produced from the time of the cross-sectional baseline.</p>
+<pre><code class="language-r">cs.no.outcomes &lt;- create.baseline(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;,
+    t2.name = &quot;t2&quot;, outcome.names = NULL)
+cs.no.outcomes[1:2, ]
+#&gt;                  id   age    sex    region                   baseline.condition
+#&gt;              &lt;char&gt; &lt;int&gt; &lt;char&gt;    &lt;char&gt;                               &lt;char&gt;
+#&gt; 1: 01KTl0KSK88EFV8N    69   Male      West moderate symptoms or light procedure
+#&gt; 2: 01ZbYuUoYJeIyiVH    61   Male Northeast      Major heart attack or operation
+#&gt;    diabetes   ace    bb statin hospital death cross.sectional.time
+#&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;    &lt;int&gt; &lt;int&gt;                &lt;num&gt;
+#&gt; 1:        0     1     0      1        0     0                    0
+#&gt; 2:        0     0     0      0        0     0                    0
+</code></pre>
+<p>As a reminder, summary statistics like the mean age at diagnosis should be calculated based on one row per patient.  Otherwise, the mean value would be weighted according to the patient’s number of rows in the panel data.  As a point of comparison, consider the mean age in the baseline data versus the mean age in the panel data:</p>
+<pre><code class="language-r">baseline[, mean(age)]
+#&gt; [1] 64.982
+</code></pre>
+<pre><code class="language-r">simulated.chd[, mean(age)]
+#&gt; [1] 64.81908
+</code></pre>
+<h2 id="calculating-utilization">Calculating Utilization</h2>
+<p>Time-varying factors with binary measurements can include intermittent periods of utilization.  Calculating how much or how often a medication is used – or the amount of time spent in the hospital – can be the basis for studying the effect or cost of an intervention.  The <strong>calculate.utilization</strong> method facilitates calculations of the total amount or proportion of time that a binary outcome variable is in effect.  This calculation can be performed for a specified interval of time.  As an initial example, we will calculate the number of days that each patient possessed each medication or was hospitalized during the first year (365 days) of follow-up:</p>
+<pre><code class="language-r">calculate.utilization(dat = simulated.chd, outcome.names = c(&quot;ace&quot;, &quot;bb&quot;, &quot;statin&quot;,
+    &quot;hospital&quot;), begin = 0, end = 365, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;,
+    type = &quot;total&quot;, full.followup = F)
+#&gt;                     id   ace    bb statin hospital
+#&gt;                 &lt;char&gt; &lt;num&gt; &lt;num&gt;  &lt;num&gt;    &lt;num&gt;
+#&gt;    1: 01KTl0KSK88EFV8N   270   245    263        0
+#&gt;    2: 01ZbYuUoYJeIyiVH    30    60     40       27
+#&gt;    3: 01oLxxu87rRDCIvo    64    64     64        0
+#&gt;    4: 01rOm5qEH4GLCiL5   365   365    365       87
+#&gt;    5: 021eg6OjCoGotbXK    61    30     94        0
+#&gt;   ---                                             
+#&gt;  996: zm1gtU2uw866RDGy    60    97    126        0
+#&gt;  997: zqMNWR16s2XrWiYJ    90   128    307       57
+#&gt;  998: zs7NTtHeWTecHvxS   246   239    289        0
+#&gt;  999: ztSPQ3OMBA2CzgSp   180   157    218        0
+#&gt; 1000: zxOx9moOQBqSiKq2    62    62     60        0
+</code></pre>
+<p>Setting the full.followup parameter to TRUE will restrict attention to subjects who are fully observed during the period.  Any patient with fewer than 365 days of follow-up would be removed from consideration:</p>
+<pre><code class="language-r">calculate.utilization(dat = simulated.chd, outcome.names = c(&quot;ace&quot;, &quot;bb&quot;, &quot;statin&quot;,
+    &quot;hospital&quot;), begin = 0, end = 365, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;,
+    type = &quot;total&quot;, full.followup = T)
+#&gt;                    id   ace    bb statin hospital
+#&gt;                &lt;char&gt; &lt;num&gt; &lt;num&gt;  &lt;num&gt;    &lt;num&gt;
+#&gt;   1: 01KTl0KSK88EFV8N   270   245    263        0
+#&gt;   2: 01rOm5qEH4GLCiL5   365   365    365       87
+#&gt;   3: 09AgoPRwaNTV9bqg    90   182    222        0
+#&gt;   4: 0Ej1m7QODV3uGh2N   265   363    365        0
+#&gt;   5: 0Iog4hzdp33JXcyv   266    90    358        0
+#&gt;  ---                                             
+#&gt; 557: zX3s9WnLFsUxvhjE   180   270    270        0
+#&gt; 558: zXYVDQrr2zh4bBb3   279   307    350        0
+#&gt; 559: zaJV99JUjXSXsS7g   194   233    295       39
+#&gt; 560: zqMNWR16s2XrWiYJ    90   128    307       57
+#&gt; 561: zs7NTtHeWTecHvxS   246   239    289        0
+</code></pre>
+<p>Utilization can also be calculated as a proportion of the period of observation, dividing the total days of utilization by the total days of follow-up:</p>
+<pre><code class="language-r">med.utilization.rates &lt;- calculate.utilization(dat = simulated.chd, outcome.names = c(&quot;ace&quot;,
+    &quot;bb&quot;, &quot;statin&quot;, &quot;hospital&quot;), begin = 0, end = 365, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;,
+    t2.name = &quot;t2&quot;, type = &quot;rate&quot;, full.followup = T)
+
+med.utilization.rates
+#&gt;                    id       ace        bb    statin  hospital
+#&gt;                &lt;char&gt;     &lt;num&gt;     &lt;num&gt;     &lt;num&gt;     &lt;num&gt;
+#&gt;   1: 01KTl0KSK88EFV8N 0.7397260 0.6712329 0.7205479 0.0000000
+#&gt;   2: 01rOm5qEH4GLCiL5 1.0000000 1.0000000 1.0000000 0.2383562
+#&gt;   3: 09AgoPRwaNTV9bqg 0.2465753 0.4986301 0.6082192 0.0000000
+#&gt;   4: 0Ej1m7QODV3uGh2N 0.7260274 0.9945205 1.0000000 0.0000000
+#&gt;   5: 0Iog4hzdp33JXcyv 0.7287671 0.2465753 0.9808219 0.0000000
+#&gt;  ---                                                         
+#&gt; 557: zX3s9WnLFsUxvhjE 0.4931507 0.7397260 0.7397260 0.0000000
+#&gt; 558: zXYVDQrr2zh4bBb3 0.7643836 0.8410959 0.9589041 0.0000000
+#&gt; 559: zaJV99JUjXSXsS7g 0.5315068 0.6383562 0.8082192 0.1068493
+#&gt; 560: zqMNWR16s2XrWiYJ 0.2465753 0.3506849 0.8410959 0.1561644
+#&gt; 561: zs7NTtHeWTecHvxS 0.6739726 0.6547945 0.7917808 0.0000000
+</code></pre>
+<p>These rates can then be used in subsequent calculations.  For instance, we could calculate the proportion of the patients with at least 365 days of follow-up who possessed each medication at least 80% of the time:</p>
+<pre><code class="language-r">med.utilization.rates[, lapply(X = .SD, FUN = function(x) {
+    return(mean(x &gt; 0.8))
+}), .SDcols = c(&quot;ace&quot;, &quot;bb&quot;, &quot;statin&quot;)]
+#&gt;          ace        bb    statin
+#&gt;        &lt;num&gt;     &lt;num&gt;     &lt;num&gt;
+#&gt; 1: 0.2174688 0.3368984 0.5579323
+</code></pre>
+<p>Then, based upon these calculations, we would be able to compare the medications in terms of the proportion of patients with a sufficient degree of utilization.</p>
+<h2 id="counting-events">Counting Events</h2>
+<p>Outcome variables can also be analyzed in terms of their overall counts, such as the number of deaths or hospitalizations in the sample.  The <strong>count.events</strong> method is used to calculate the number of rows in which a binary variable is set to TRUE:</p>
+<pre><code class="language-r">count.events(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), type = &quot;overall&quot;)
+#&gt;    hospital death
+#&gt;       &lt;int&gt; &lt;int&gt;
+#&gt; 1:     1678   148
+</code></pre>
+<p>This count can also be framed in terms of the <strong>distinct</strong> occurrences of an event.  When type = “distinct”, the count.events method only adds to the count when an event is preceded by a gap in utilization.</p>
+<pre><code class="language-r">count.events(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), type = &quot;distinct&quot;)
+#&gt;    hospital death
+#&gt;       &lt;int&gt; &lt;int&gt;
+#&gt; 1:     1007   148
+</code></pre>
+<p>In particular, distinct counting reduces the count of hospitalizations substantially.  Some hospitalizations extend over a period encompassing multiple rows of observation.  (For instance, if the patient’s medications are changed during the hospitalization, it would trigger the formation of an additional row in the panel without discharing the patient from the hospital.)  Hospitalizations in particular have costs associated with admission and separate costs based on the length of stay.  As an example, if one patient had an admission for 3 days and another for 5, the costs could be substantially different than a single admission that lasts for 8 days.</p>
+<p>The count.events method also allows for grouped calculations based on at least one categorical variable.  For instance, we could count the number of distinct hospitalizations and deaths in each geographic region:</p>
+<pre><code class="language-r">count.events(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), grouping.variables = &quot;region&quot;,
+    type = &quot;distinct&quot;)
+#&gt; Key: &lt;region&gt;
+#&gt;       region hospital death
+#&gt;       &lt;char&gt;    &lt;int&gt; &lt;int&gt;
+#&gt; 1:   Midwest      222    40
+#&gt; 2: Northeast      310    41
+#&gt; 3:     South      163    28
+#&gt; 4:      West      313    39
+</code></pre>
+<p>The count.events method can also produce counts for individual subjects when the identifier is used as a grouping variable:</p>
+<pre><code class="language-r">count.events(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), grouping.variables = &quot;id&quot;,
+    type = &quot;distinct&quot;)
+#&gt; Key: &lt;id&gt;
+#&gt;                     id hospital death
+#&gt;                 &lt;char&gt;    &lt;int&gt; &lt;int&gt;
+#&gt;    1: 01KTl0KSK88EFV8N        0     0
+#&gt;    2: 01ZbYuUoYJeIyiVH        1     1
+#&gt;    3: 01oLxxu87rRDCIvo        0     0
+#&gt;    4: 01rOm5qEH4GLCiL5        8     0
+#&gt;    5: 021eg6OjCoGotbXK        0     0
+#&gt;   ---                                
+#&gt;  996: zm1gtU2uw866RDGy        0     0
+#&gt;  997: zqMNWR16s2XrWiYJ        2     0
+#&gt;  998: zs7NTtHeWTecHvxS        0     0
+#&gt;  999: ztSPQ3OMBA2CzgSp        1     0
+#&gt; 1000: zxOx9moOQBqSiKq2        0     0
+</code></pre>
+<p>Likewise, we could also group the patients by their treatment status, such as examining the combinations of utilization of ace inhibitors and beta blockers at the time of an event:</p>
+<pre><code class="language-r">count.events(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), grouping.variables = c(&quot;ace&quot;,
+    &quot;bb&quot;), type = &quot;distinct&quot;)
+#&gt; Key: &lt;ace, bb&gt;
+#&gt;      ace    bb hospital death
+#&gt;    &lt;int&gt; &lt;int&gt;    &lt;int&gt; &lt;int&gt;
+#&gt; 1:     0     0      320    86
+#&gt; 2:     0     1      228     9
+#&gt; 3:     1     0      182    24
+#&gt; 4:     1     1      282    29
+</code></pre>
+<h2 id="crude-rates-of-events">Crude Rates of Events</h2>
+<p>Comparing groups in terms of their total events does not incorporate the degree of follow-up time.  If one patient is hospitalized once in 6 months of observation, and if a second patient is hospitalized once over the course of a year, then the first patient’s rate of events per year could be estimated as double that of the second patient’s rate.  The <strong>crude.rates</strong> method is designed to calculate the number of events divided by the amount of <strong>person-time follow-up</strong> (the total length of follow-up summed over the relevant patients).  Looking at the full simulated.chd data, the rates of distinct events of hospitalizations and mortality are:</p>
+<pre><code class="language-r">crude.rates(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), type = &quot;distinct&quot;)
+#&gt; Key: &lt;period&gt;
+#&gt;           period observation.time hospital death hospital.rate   death.rate
+#&gt;           &lt;char&gt;            &lt;num&gt;    &lt;int&gt; &lt;int&gt;         &lt;num&gt;        &lt;num&gt;
+#&gt; 1: All Follow-Up           722772     1007   148   0.001393247 0.0002047672
+</code></pre>
+<p>The rates would translate to roughly 0.0014 hospitalizations and 0.0002 deaths per person-day of followup.</p>
+<p>When interpreting these results, it can be helpful to recharacterize the period of time.  For instance, using 100 person-years of follow-up can place the rates onto a scale that is more similar to a human life span.  The crude.rates method implements this by specifying a time.multiplier:</p>
+<pre><code class="language-r">crude.rates(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), time.multiplier = 100 *
+    365.25)
+#&gt; Key: &lt;period&gt;
+#&gt;           period observation.time hospital death hospital.rate death.rate
+#&gt;           &lt;char&gt;            &lt;num&gt;    &lt;int&gt; &lt;int&gt;         &lt;num&gt;      &lt;num&gt;
+#&gt; 1: All Follow-Up           722772     1678   148      84.79707   7.479122
+</code></pre>
+<p>These crude rates can then be grouped by categorical variables.  Here we compare the event rates for patients on and off of each medication:</p>
+<pre><code class="language-r">crude.rates(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), time.multiplier = 100 *
+    365.25, grouping.variables = &quot;ace&quot;)
+#&gt; Key: &lt;ace, period&gt;
+#&gt;      ace        period observation.time hospital death hospital.rate death.rate
+#&gt;    &lt;int&gt;        &lt;char&gt;            &lt;num&gt;    &lt;int&gt; &lt;int&gt;         &lt;num&gt;      &lt;num&gt;
+#&gt; 1:     0 All Follow-Up           340745      887    95      95.07894  10.183202
+#&gt; 2:     1 All Follow-Up           382027      791    53      75.62626   5.067247
+</code></pre>
+<pre><code class="language-r">
+crude.rates(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), time.multiplier = 100 *
+    365.25, grouping.variables = &quot;bb&quot;)
+#&gt; Key: &lt;bb, period&gt;
+#&gt;       bb        period observation.time hospital death hospital.rate death.rate
+#&gt;    &lt;int&gt;        &lt;char&gt;            &lt;num&gt;    &lt;int&gt; &lt;int&gt;         &lt;num&gt;      &lt;num&gt;
+#&gt; 1:     0 All Follow-Up           274077      819   110     109.14442  14.659202
+#&gt; 2:     1 All Follow-Up           448695      859    38      69.92495   3.093304
+</code></pre>
+<pre><code class="language-r">
+crude.rates(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), time.multiplier = 100 *
+    365.25, grouping.variables = &quot;statin&quot;)
+#&gt; Key: &lt;statin, period&gt;
+#&gt;    statin        period observation.time hospital death hospital.rate
+#&gt;     &lt;int&gt;        &lt;char&gt;            &lt;num&gt;    &lt;int&gt; &lt;int&gt;         &lt;num&gt;
+#&gt; 1:      0 All Follow-Up           187581      645   107      125.5917
+#&gt; 2:      1 All Follow-Up           535191     1033    41       70.4988
+#&gt;    death.rate
+#&gt;         &lt;num&gt;
+#&gt; 1:  20.834599
+#&gt; 2:   2.798113
+</code></pre>
+<p>The ratio of these crude rates could be one estimate of the treatment effect, showing that patients who take these medications have lower rates of mortality and hospitalizations.  However, some caveats apply:  these crude rates may reflect confounding from other variables (measured or unmeasured) in observational studies.  Additionally, complex factors can be at play.  For instance, a patient with clear warning signs of an adverse event may be placed on these medications.  If the event occurs shortly thereafter, the data would dubiously show a harmful association between the medication and the event.  Without care in interpretation, we might falsely conclude that going to the hospital is the factor that creates the most hazard for mortality.</p>
+<p>The crude rates can also be calculated in different eras at time by specifying numeric cut.points:</p>
+<pre><code class="language-r">crude.rates(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), time.multiplier = 100 *
+    365.25, cut.points = c(90, 365/2))
+#&gt; Key: &lt;period&gt;
+#&gt;               period observation.time hospital death hospital.rate death.rate
+#&gt;               &lt;char&gt;            &lt;num&gt;    &lt;int&gt; &lt;int&gt;         &lt;num&gt;      &lt;num&gt;
+#&gt; 1:         Before 90          87670.0      214    22       89.1565   9.165621
+#&gt; 2: On or After 182.5         571052.5     1305    91       83.4689   5.820437
+#&gt; 3:       [90, 182.5)          64049.5      218    35      124.3171  19.959172
+</code></pre>
+<p>These calculations can also be performed in groups, such as comparing patients on and off beta blockers in each era in terms of their rates of hospitalization and mortality:</p>
+<pre><code class="language-r">crude.rates(dat = simulated.chd, outcome.names = c(&quot;hospital&quot;, &quot;death&quot;), time.multiplier = 100 *
+    365.25, grouping.variables = &quot;bb&quot;, cut.points = c(90, 365/2))
+#&gt; Key: &lt;bb, period&gt;
+#&gt;       bb            period observation.time hospital death hospital.rate
+#&gt;    &lt;int&gt;            &lt;char&gt;            &lt;num&gt;    &lt;int&gt; &lt;int&gt;         &lt;num&gt;
+#&gt; 1:     0         Before 90          29169.0      104    13     130.22730
+#&gt; 2:     0 On or After 182.5         225173.0      633    70     102.67805
+#&gt; 3:     0       [90, 182.5)          17996.0       91    27     184.69521
+#&gt; 4:     1         Before 90          58501.0      110     9      68.67831
+#&gt; 5:     1 On or After 182.5         345565.5      671    21      70.92223
+#&gt; 6:     1       [90, 182.5)          38920.5       95     8      89.15289
+#&gt;    death.rate
+#&gt;         &lt;num&gt;
+#&gt; 1:  16.278412
+#&gt; 2:  11.354603
+#&gt; 3:  54.799678
+#&gt; 4:   5.619135
+#&gt; 5:   2.219623
+#&gt; 6:   7.507612
+</code></pre>
+<p>Panel data presents challenges for separating the data into eras of time.  Many rows of data may include intervals of time that overlap multiple eras.  The crude.rates method relies upon the <strong>era.splits</strong> method to restructure the data.  For rows that overlap the eras specified by the cut.points, the method adds new rows to the data set and modifies the time points of the existing rows.  This ensures that each row belongs to a single era and that no information is lost.</p>
+<p>As an example, let’s consider the first two rows of the simulated.chd data:</p>
+<pre><code class="language-r">simulated.chd[1:2, .SD, .SDcols = c(&quot;id&quot;, &quot;t1&quot;, &quot;t2&quot;)]
+#&gt;                  id    t1    t2
+#&gt;              &lt;char&gt; &lt;num&gt; &lt;num&gt;
+#&gt; 1: 01KTl0KSK88EFV8N     0     8
+#&gt; 2: 01KTl0KSK88EFV8N     8    30
+</code></pre>
+<p>Suppose an analysis wants to consider the experience of patients in several periods:  a) before 3 days, b) at least 3 and less than 5 days, and c) all subsequent follow-up starting at 5 days.  Applying the era.splits method to these two rows of data splits the first row into 3 rows of data that are mutually exclusive, collectively exhaustive, and aligned with the specified eras:</p>
+<pre><code class="language-r">era.splits(dat = simulated.chd[1:2, .SD, .SDcols = c(&quot;id&quot;, &quot;t1&quot;, &quot;t2&quot;)], cut.points = c(3,
+    5))
+#&gt;                  id    t1    t2
+#&gt;              &lt;char&gt; &lt;num&gt; &lt;num&gt;
+#&gt; 1: 01KTl0KSK88EFV8N     0     3
+#&gt; 2: 01KTl0KSK88EFV8N     3     5
+#&gt; 3: 01KTl0KSK88EFV8N     5     8
+#&gt; 4: 01KTl0KSK88EFV8N     8    30
+</code></pre>
+<h2 id="quality-checks-of-panel-data">Quality Checks of Panel Data</h2>
+<p>The complexity and unfamiliarity of the panel structure can present challenges in basic investigations of the data.  The tvtools package includes a number of methods for identifying potential issues with panel data.</p>
+<h3 id="measurement-rates">Measurement Rates</h3>
+<p>Longitudinal data may be subject to censoring and loss of follow-up.  The measurement.rate function calculates the proportion of subjects who have records at the specified point in follow-up:</p>
+<pre><code class="language-r">measurement.rate(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;,
+    time.point = 365)
+#&gt;     time observed total.subjects rate.observed rate.not.observed
+#&gt;    &lt;num&gt;    &lt;int&gt;          &lt;int&gt;         &lt;num&gt;             &lt;num&gt;
+#&gt; 1:   365      556           1000         0.556             0.444
+</code></pre>
+<p>Note that the rate not observed incorporates a) patients censored or lost to follow-up at that time, and also b) patients who did not survive to that time.</p>
+<p>The rate of measurement can also be calculated in groups:</p>
+<pre><code class="language-r">measurement.rate(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;,
+    time.point = 365, grouping.variables = &quot;region&quot;)
+#&gt; Key: &lt;region&gt;
+#&gt;       region  time observed total.subjects rate.observed rate.not.observed
+#&gt;       &lt;char&gt; &lt;num&gt;    &lt;int&gt;          &lt;int&gt;         &lt;num&gt;             &lt;num&gt;
+#&gt; 1:   Midwest   365      103            191     0.5392670         0.4607330
+#&gt; 2: Northeast   365      167            294     0.5680272         0.4319728
+#&gt; 3:     South   365      113            196     0.5765306         0.4234694
+#&gt; 4:      West   365      173            319     0.5423197         0.4576803
+</code></pre>
+<h3 id="panel-gaps">Panel Gaps</h3>
+<p>Longitudinal records can include periods of censorship.  In panel data, this would show up through the absence of a record.  The <strong>panel.gaps</strong> method is designed to identify gaps between earlier and later observed times, with an assumed starting time of t1 = 0.  Here we can verify no gaps in the simulated.chd data:</p>
+<pre><code class="language-r">pg.check = panel.gaps(dat = orig.data, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;)
+pg.check[, .N, gap_before]
+#&gt;    gap_before     N
+#&gt;        &lt;lgcl&gt; &lt;int&gt;
+#&gt; 1:      FALSE 33572
+</code></pre>
+<p>We could also artificially construct gaps in the panel data by only selecting a subset of rows.  This will verify that the panel gaps are correctly identified:</p>
+<pre><code class="language-r">gap.dat &lt;- simulated.chd[c(1, 3, 5, 7, 58, 60, 64), ]
+pg.check.2 &lt;- panel.gaps(dat = gap.dat, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;)
+pg.check.2[, .SD, .SDcols = c(&quot;id&quot;, &quot;t1&quot;, &quot;t2&quot;, &quot;gap_before&quot;)]
+#&gt;                  id    t1    t2 gap_before
+#&gt;              &lt;char&gt; &lt;num&gt; &lt;num&gt;     &lt;lgcl&gt;
+#&gt; 1: 01KTl0KSK88EFV8N     0     8      FALSE
+#&gt; 2: 01KTl0KSK88EFV8N    30    38       TRUE
+#&gt; 3: 01KTl0KSK88EFV8N    46    66       TRUE
+#&gt; 4: 01KTl0KSK88EFV8N    90    94       TRUE
+#&gt; 5: 01ZbYuUoYJeIyiVH     0     1      FALSE
+#&gt; 6: 01ZbYuUoYJeIyiVH    10    30       TRUE
+#&gt; 7: 01ZbYuUoYJeIyiVH    70    70       TRUE
+</code></pre>
+<p>We can also identify the earliest gap for each subject using <strong>first.panel.gap</strong>:</p>
+<pre><code class="language-r">first.panel.gap(dat = gap.dat, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;)
+#&gt;                  id gap_before.first.event
+#&gt;              &lt;char&gt;                  &lt;num&gt;
+#&gt; 1: 01KTl0KSK88EFV8N                     30
+#&gt; 2: 01ZbYuUoYJeIyiVH                     10
+</code></pre>
+<p>Likewise, a subject’s latest gap can be found with <strong>last.panel.gap</strong>:</p>
+<pre><code class="language-r">last.panel.gap(dat = gap.dat, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;)
+#&gt;                  id gap_before.last.event
+#&gt;              &lt;char&gt;                 &lt;num&gt;
+#&gt; 1: 01KTl0KSK88EFV8N                    90
+#&gt; 2: 01ZbYuUoYJeIyiVH                    70
+</code></pre>
+<h3 id="panel-overlaps">Panel Overlaps</h3>
+<p>For a single subject, we assume that the panel data is structured so that the rows and time intervals will be mutually exclusive.  That assumption can be validated only through investigation of the data.  The panel.overlaps function identifies whether each subject has any period of potentially overlapping time intervals:</p>
+<pre><code class="language-r">possible.overlaps &lt;- panel.overlaps(dat = simulated.chd, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;,
+    t2.name = &quot;t2&quot;)
+# print(possible.overlaps)
+possible.overlaps[, mean(overlapping_panels == F)]
+#&gt; [1] 1
+</code></pre>
+<p>This verifies that the simulated.chd meets the assumption of mutually exlusive periods of observation for each user.</p>
+<p>We can then construct a panel with overlapping observations:</p>
+<pre><code class="language-r">overlap.dat &lt;- data.table(id = &quot;ABC&quot;, t1 = c(0, 7, 14, 21), t2 = c(8, 15, 21, 30), ace = c(1,0,1,0))
+</code></pre>
+<pre><code class="language-r">panel.overlaps(dat = overlap.dat, id.name = &quot;id&quot;, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;)
+#&gt;        id overlapping_panels
+#&gt;    &lt;char&gt;             &lt;lgcl&gt;
+#&gt; 1:    ABC               TRUE
+</code></pre>
+<p>It should be noted that panel.overlaps requires pairwise comparisons of the time intervals within each subject.  As a result, larger panels can require some computational time to complete the investigation of overlaps.</p>
+<h2 id="events-of-unusual-duration">Events of Unusual Duration</h2>
+<p>Panel data is structured on the notion that new events will take effect at the beginning of the time interval for the record.  This assumption should be carefully verified in data analyses.  For instance, one might erroneously code death at the end of the last interval of observation.  If the last interval is especially lengthy, an analysis of the data might systematically record the deaths at significantly earlier times than they occurred.</p>
+<p>The <strong>unusual.duration</strong> method is designed to identify cases in which an event occurs and the duration of the interval is long enough to be considered unusual.  For instance, we might identify the hospitalizations that last longer than 100 days (in a single row):</p>
+<pre><code class="language-r">long.hospitalizations &lt;- unusual.duration(dat = simulated.chd, outcome.name = &quot;hospital&quot;,
+    max.length = 100, t1.name = &quot;t1&quot;, t2.name = &quot;t2&quot;)
+long.hospitalizations[, .SD, .SDcols = c(&quot;id&quot;, &quot;t1&quot;, &quot;t2&quot;, &quot;hospital&quot;)]
+#&gt;                   id    t1    t2 hospital
+#&gt;               &lt;char&gt; &lt;num&gt; &lt;num&gt;    &lt;int&gt;
+#&gt;  1: 01rOm5qEH4GLCiL5   562   823        1
+#&gt;  2: 01rOm5qEH4GLCiL5  1206  1372        1
+#&gt;  3: 378Ax3nk7KUuz9CV   507   612        1
+#&gt;  4: 5bsGQKWkbeqqCDun  1487  1929        1
+#&gt;  5: 5bsGQKWkbeqqCDun  2035  2314        1
+#&gt;  6: AnDxV4tHY0ceJg8R  1744  1854        1
+#&gt;  7: D8GJSiAFkcv29KYV  1688  1829        1
+#&gt;  8: FhkQxeEx9dvO2iZb  1387  1545        1
+#&gt;  9: H8aM5GuMndOLTrF8  1670  1832        1
+#&gt; 10: IJQFwVwBBc23vpmK  2001  2206        1
+#&gt; 11: QUUws4eexQZxWIl9   645   822        1
+#&gt; 12: REaoGgY18CgbLneN  1854  2031        1
+#&gt; 13: RtwWZQiF192PDFR9   387   554        1
+#&gt; 14: V5xu6shLtlYaIVWB   848  1002        1
+#&gt; 15: VUjW6PZAYA6OQQM3  2134  2400        1
+#&gt; 16: ZIa8W5pvnPoETLye   288   452        1
+#&gt; 17: ZSWU3tOI1LqYYd1N   656   832        1
+#&gt; 18: d8CIC18WilrexiD1   373   549        1
+#&gt; 19: d8CIC18WilrexiD1  1752  1914        1
+#&gt; 20: dCUgM2bLCEzlMvqt  1669  1849        1
+#&gt; 21: dQ4PHmnuZel9Aicq   684   849        1
+#&gt; 22: jGjvJOMwhwyQtipu  1208  1561        1
+#&gt; 23: vIpAgiKixKObEXfh   814   948        1
+#&gt;                   id    t1    t2 hospital
+</code></pre>
+<p>These cases might be further investigated to ensure the accuracy of the data.  Likewise, we could also verify that deaths are not recorded for a period greater than 1 day:</p>
+<pre><code class="language-r">unusual.duration(dat = simulated.chd, outcome.name = &quot;death&quot;, max.length = 1, t1.name = &quot;t1&quot;,
+    t2.name = &quot;t2&quot;)
+#&gt; Empty data.table (0 rows and 15 cols): id,t1,t2,age,sex,region...
+</code></pre>
+<p>This verifies that the time of mortality will not be misinterpreted based upon differences between the beginning and end of the interval of observation.  If large differences are noted, then some restructuring of the data may be necessary.</p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>
+</body>
+</html>

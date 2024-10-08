@@ -1,0 +1,485 @@
+---
+title: "Introduction_to_tvtools"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction_to_DTwrappers2}
+  %\VignetteEngine{knitr::knitr}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  tidy = TRUE
+)
+```
+
+
+```{r, include=FALSE}
+devtools::load_all(".")
+```
+
+## Introduction
+
+Longitudinal data collected over a period of time can provide a view of a population's changes.  Gathering and structuring longitudinal information may require a more flexible design for the data.  When a single subject's records are updated at random intervals, and when the length of follow-up varies, a more complex data structure may be required.  **Panel data** provides one option for storing longitudinal records.  This structures information over intervals of time, with a variable number of records per subject.  While useful for storing data, the structure of panel data creates complexities in data analyses.  Calculations and models necessarily must account for the length of time.
+
+The **tvtools** package for R was published to simplify the process of exploring and analyzing panel data.  This vignette will provide an overview of panel data and introduce a range of methods.
+
+## Sample Data
+
+The tvtools package includes a sample data set called **simulated.chd**.  These fictional records were simulated based on a scenario of medical follow-up for patients with coronary heart disease (CHD). 
+
+```{r setup}
+library(tvtools)
+library(data.table)
+library(DTwrappers)
+
+file_path <- system.file("extdata", "simulated_data.csv", package="tvtools")
+simulated.chd <- fread(input = file_path)
+
+orig.data <- copy(simulated.chd)
+
+```
+
+We can begin exploring the data by noting its dimensionality:
+
+```{r }
+dim(simulated.chd)
+```
+
+The first ten rows of the simulated.chd data are:
+
+```{r }
+simulated.chd[1:10,]
+```
+
+Here we see a partial view of the records for a single patient with id `r simulated.chd[1, id]`.  The variables t1 and t2 represent a time interval for the record.  This will be discussed further in the section on the structure of panel data.  The patient's age at diagnosis, sex, geographic region, baseline condition, and diabetes status are provided.  The variables ace (ace inhibitor), bb (beta blocker), and statin provide records of the possession of common prescription medications for patients with CHD.  The patient's admissions to the hospital are recorded, and the death variable is used to identify cases of mortality.  The medications, hospital status, and mortality of the patient can change over time.  These will also be discussed further.
+
+The simulated data include records on many patients.  For instance, a portion of the recods for several patients are shown below:
+
+```{r }
+simulated.chd[58:70,]
+```
+
+## Structure of Panel Data
+
+We can now more carefully define the elements of panel data.  Some necessary variables include the:
+
+* **subject identifier**:  This uniquely identifies a subject so that records across multiple rows can be linked.
+
+* **time interval**:  This records a period of time [t1, t2) during which the record is observed.  In particular, panel data assumes that a) the values of the record **take effect at time t1**, and b) the values **remain constant** from time t1 to time t2.  It is important for the time intervals in a subject's different rows to be mutually exclusive.
+
+* **constant variables**:  These values appear in a patient's records but cannot change.  For instance, a patient's age at the time of the first diagnosis of CHD would not vary across the records in follow-up.  Important baseline factors, such as a history of comorbid medical conditions, might also be included as constant variables.
+
+* **time-varying variables**:  These values can change over time.  Records of a patient's weight, laboratory tests, medication usage, and hospitalization status are all examples of time-varying variables.  Medical outcomes such as medication adherence or the costs of hospitalization can often be the basis of considerable study.  Time-varying data could reasonably illustrate a period during which a medical patient is adherent to a medication or the duration of a hospital admission.  However, acute events such as a heart attack are necessarily not long lasting.  Ideally a panel would be structured to update the record at a time shortly after the event.  In some cases, interpretation of the panel is required.  For instance, a lengthy interval that begins with a heart attack would require recognition that the event did not last for the entire duration.  Likewise, if an event such as mortality is observed during a lengthy interval, the panel should be restructured with a new record marking the death after that previous interval.  Because of these intricacies, additional attention to the details can be required.  A practitioner should be careful to properly interpret the events recorded in panel data and to ensure their quality.
+
+To better examine these issues, we will consider the first few rows of the simulated.chd data:
+
+```{r }
+simulated.chd[1:3,]
+```
+
+This illustrates a short period of follow-up for a patient.  The first row begins with t1 = 0, the moment of the patient's initial diagnosis of CHD.  The patient is 69 years old, male, and living in the west.  CHD was diagnosed from a baseline condition that included moderate symptoms or a light procedure.  The patient did not have diabetes.  At the beginning of the interval (t1 = 0), the patient possessed ace inhibitors (ace = 1) and statin medications (statin = 1).  The patient did not possess a beta blocker (bb = 0).  The patient was also not admitted to the hospital (hospital = 0) and was alive (death = 0).  This state of affairs was assumed to persist for 8 days, until the end of the first interval (t2 = 8).  Then a new record (the second row) was entered.  It is certainly possible for an update to include no changes to the time-varying records.  However, an efficient panel structure would only generate new records when updates occur.  In this case, the patient filled a prescription for a beta blocker (bb = 1) at time t1 = 8 days.  The patient was then on all three medications (ace = 1, bb = 1, statin = 1) with no hospitalizations (hospital = 0) and while remaining alive (death = 0).  A third row was generated at day t1 = 30.  In this case, the patient no longer possessed a statin medication (statin = 0), while the previous row's other factors remained fixed.  This record was maintained for 8 days (t2 = 38).  Generalizing to all of the records for a single patient, the panel presents a historical record of the patient's condition.  The full set of panel data then presents the recorded histories for all of the patients.  Each patient is followed from their moment of diagnosis until death or a loss of follow-up.
+
+## Sorting
+
+For most applications, structuring panel data in sorted order can simplify the subsequent analyses.  The **structure.panel** method is used to sort by the subject's identifier and beginning time interval.
+
+```{r }
+simulated.chd <- structure.panel(dat = simulated.chd, id.name = "id", t1.name = "t1")
+
+simulated.chd[1:3,]
+```
+
+As an additional example, we'll show how an unsorted panel data set can be reordered:
+
+```{r }
+structure.panel(dat = simulated.chd[c(2,4,3,1),])
+```
+
+## Methods
+
+The tvtools package is designed to facilitate a range of methods to explore and analyze panel data.  These include summarization techniques, methods of calculation, and quality checks.
+
+### Summarization
+
+The **summarize.panel** function is designed to provide a simple summary of a panel data structure.  The column name for the subject's unique identifier is specified to calculate the number of subjects and the mean records per subject.  The column names for the time intervals help to gain a sense of the amount of follow-up time observed in the data.
+
+```{r }
+summarize.panel(dat = simulated.chd, id.name = "id", t1.name = "t1", t2.name = "t2")
+```
+
+
+This summary can also be produced in subgroups by specifying one or more categorical grouping variables:
+
+```{r }
+summarize.panel(dat = simulated.chd, id.name = "id", t1.name = "t1", t2.name = "t2", grouping.variables = "sex")
+
+summarize.panel(dat = simulated.chd, id.name = "id", t1.name = "t1", t2.name = "t2", grouping.variables = c("sex", "region"))
+```
+
+
+### Follow-Up Time Calculations
+
+The length of follow-up time can be a critical factor in the study's analytical judgments and selected methods.  In some applications, one might choose to only include patients who completed at least 1 year of observation or to ensure that the median length of follow-up is sufficient for the goals of the study.  
+
+The followup.time function calculates the length of observation for each patient.  This may be performed in two separate ways:
+
+* **Max Follow-Up**:  Calculate the last observed time for each subject.
+
+* **Total Follow-Up**:  Calculate the overall amount of observed time for each subject.  This has the effect of removing missing time intervals or including reference points other than time zero.
+
+On the simulated.chd data, we can calculate the maximum follow-up time for each subject:
+
+```{r }
+followup.time(dat = simulated.chd, id.name = "id", t2.name = "t2", calculate.as = "max")
+```
+
+
+Likewise, shifting to the total follow-up also leads to the same results.  
+
+```{r }
+followup.time(dat = simulated.chd, id.name = "id", t1.name = "t1", t2.name = "t2", calculate.as = "total")
+```
+
+
+
+This is true because the simulated.chd data begins at a baseline of t1 = 0 for each patient and does not include any missing time intervals over the length of any patient's observation.
+
+
+The followup.time method can be applied to all or a subset of a single subject's records.  Let's consider the case of one patient from the simulated.chd data:
+
+```{r }
+followup.time(dat = simulated.chd[id == id[1],], id.name = "id", t1.name = "t1", t2.name = "t2", calculate.as = "total")
+followup.time(dat = simulated.chd[id == id[1],][5:20,], id.name = "id", t1.name = "t1", t2.name = "t2", calculate.as = "total")
+followup.time(dat = simulated.chd[id == id[1],][5:20,], id.name = "id", t1.name = "t1", t2.name = "t2", calculate.as = "max")
+```
+
+These calculations show that the patient was followed for a total of 1075 days.  The records from the subject's 5th to 20th records encompass a total of 195 days, with day 241 as the latest in this period.
+
+
+The followup times can also be appended to the original data set with a user-selected name for the new column:
+```{r }
+followup.time(dat = simulated.chd, id.name = "id", t2.name = "t2", calculate.as = "max", append.to.data = T, followup.name = "followup.time")
+print(simulated.chd[1:5,])
+```
+
+
+## Measuring the Time to Events
+
+Outcome variables such as survival times may be calculated from panel data by identifying the time of an event.  The **first.event** method is designed to facilitate these calculations on a collection of outcome variables.  By specifying the identifier, we can perform the calculation separately on each subject in the data set.  In the first example, we calculate the initiation times of the three medicines -- the times at which a presciption for each medicine was first filled by the patient.
+
+
+```{r }
+first.event(dat = simulated.chd, id.name = "id", outcome.names = c("ace", "bb", "statin"), t1.name = "t1")
+```
+
+Likewise, we can calculate the time to a first hospitalization or mortality.  Note that NA values are displayed for patients who were not hospitalized and also for those who survived for the period of follow-up.
+
+```{r }
+first.event(dat = simulated.chd, id.name = "id", outcome.names = c("hospital", "death"), t1.name = "t1")
+```
+
+These times to a first event can also be calculated on the entire population by setting id.name = NULL:
+
+```{r }
+##first.event(dat = simulated.chd, id.name = NULL, outcome.names = c("hospital", "death"), t1.name = "t1")
+```
+
+These calculated quantities can also be appended to the data set:
+
+```{r }
+one.patient <- first.event(dat = simulated.chd[id == "01ZbYuUoYJeIyiVH",], id.name = "id", outcome.names = c("hospital", "death"), t1.name = "t1", append.to.table = TRUE, event.name = "time")
+setorderv(x = one.patient, cols = c("id", "t1"))
+print(one.patient)
+```
+
+Similarly, the **last.event** method, designed with similar inputs, is used to find the last time at which an event occurs:
+
+```{r }
+last.event(dat = simulated.chd, id.name = "id", outcome.names = c("hospital", "death"), t1.name = "t1")[1:5,]
+```
+
+If the end of an interval is preferred, the t2 column may be substituted:
+
+```{r }
+last.event(dat = simulated.chd, id.name = NULL, outcome.names = c("hospital", "death"), t1.name = "t2")[1:5,]
+```
+
+The last.event method is especially helpful when looking across the sample for the latest events:
+
+```{r }
+last.event(dat = simulated.chd, id.name = NULL, outcome.names = c("hospital", "death"), t1.name = "t1")
+```
+
+## Cross-Sectional Data
+
+Panel data differs from more standard data in terms of its structure and variability of longitudinal observation.  Being able to convert the panel to a more traditional form can facilitate a range of analyses.  In order to do so, we must consider the:
+
+* **Baseline Factors**:  These would be measurements recorded at the time of the study's baseline.
+
+* **Outcomes**:  These would measure the time to a subject's first event relative to the baseline.
+
+The **cross.sectional.data** method converts panel data into this standard form, with one row per subject.  Baseline measurements are recorded as of the specified time, while outcomes are measured as the time to the first occurrence of the event (or NA if not observed).  The subject's overall length of follow-up is also calculated to enable survival analyses of censored data.  We can specify the time.point as 0 to conduct the study from the beginning of the period of observation:
+
+
+```{r }
+simulated.chd[, followup.time := NULL]
+```
+
+```{r }
+baseline <- cross.sectional.data(dat = simulated.chd, time.point = 0, id.name = "id", t1.name = "t1", t2.name = "t2", outcome.names = c("hospital", "death"))
+baseline[1,]
+baseline[hospital.first.event > 0,][1:2,]
+baseline[death.first.event > 0,][1:2,]
+```
+
+The **create.baseline** method is a light wrapper of **cross.sectional.data** that forces the time point to 0:
+
+```{r }
+baseline.2 <- create.baseline(dat = simulated.chd, id.name = "id", t1.name = "t1", t2.name = "t2", outcome.names = c("hospital", "death"))
+baseline.2[hospital.first.event > 0,][1:2,]
+baseline.2[death.first.event > 0,][1:2,]
+```
+
+
+A cross-sectional data set can also be produced at later times.  In these settings, the time to the first event only includes events that occur at or after the cross-sectional time point.  By specifying relative.followup = FALSE, the event times and length of follow-up are recorded in absolute terms (relative to time zero rather than the cross-sectional baseline).
+
+```{r }
+cs.365 <- cross.sectional.data(dat = simulated.chd, time.point = 365, id.name = "id", t1.name = "t1", t2.name = "t2", outcome.names = c("hospital", "death"), relative.followup = FALSE)
+cs.365[1:2,]
+```
+
+Alternatively, we can specify relative.followup = TRUE to calculate the event and followup times after the cross-sectional baseline.
+
+```{r }
+cs.365.relative <- cross.sectional.data(dat = simulated.chd, time.point = 365, id.name = "id", t1.name = "t1", t2.name = "t2", outcome.names = c("hospital", "death"), relative.followup = TRUE)
+cs.365.relative[1:2,]
+```
+
+It is also possible to create a purely cross-sectional data set with no outcome measurements by setting outcome.names = NULL.  Then all of the measurements will be produced from the time of the cross-sectional baseline.
+
+```{r }
+cs.no.outcomes <- create.baseline(dat = simulated.chd, id.name = "id", t1.name = "t1", t2.name = "t2", outcome.names = NULL)
+cs.no.outcomes[1:2,]
+```
+
+As a reminder, summary statistics like the mean age at diagnosis should be calculated based on one row per patient.  Otherwise, the mean value would be weighted according to the patient's number of rows in the panel data.  As a point of comparison, consider the mean age in the baseline data versus the mean age in the panel data:
+
+```{r }
+baseline[, mean(age)]
+simulated.chd[, mean(age)]
+```
+
+
+## Calculating Utilization
+
+Time-varying factors with binary measurements can include intermittent periods of utilization.  Calculating how much or how often a medication is used -- or the amount of time spent in the hospital -- can be the basis for studying the effect or cost of an intervention.  The **calculate.utilization** method facilitates calculations of the total amount or proportion of time that a binary outcome variable is in effect.  This calculation can be performed for a specified interval of time.  As an initial example, we will calculate the number of days that each patient possessed each medication or was hospitalized during the first year (365 days) of follow-up:
+
+
+```{r }
+calculate.utilization(dat = simulated.chd, outcome.names = c("ace", "bb", "statin", "hospital"), begin = 0, end = 365, id.name = "id", t1.name = "t1", t2.name = "t2", type = "total", full.followup = F)
+```
+
+Setting the full.followup parameter to TRUE will restrict attention to subjects who are fully observed during the period.  Any patient with fewer than 365 days of follow-up would be removed from consideration:
+
+```{r }
+calculate.utilization(dat = simulated.chd, outcome.names = c("ace", "bb", "statin", "hospital"), begin = 0, end = 365, id.name = "id", t1.name = "t1", t2.name = "t2", type = "total", full.followup = T)
+```
+
+Utilization can also be calculated as a proportion of the period of observation, dividing the total days of utilization by the total days of follow-up:
+
+```{r }
+med.utilization.rates <- calculate.utilization(dat = simulated.chd, outcome.names = c("ace", "bb", "statin", "hospital"), begin = 0, end = 365, id.name = "id", t1.name = "t1", t2.name = "t2", type = "rate", full.followup = T)
+
+med.utilization.rates
+```
+
+These rates can then be used in subsequent calculations.  For instance, we could calculate the proportion of the patients with at least 365 days of follow-up who possessed each medication at least 80% of the time:
+
+```{r }
+med.utilization.rates[, lapply(X = .SD, FUN = function(x){return(mean(x > 0.8))}), .SDcols = c("ace", "bb", "statin")]
+```
+
+Then, based upon these calculations, we would be able to compare the medications in terms of the proportion of patients with a sufficient degree of utilization.
+
+## Counting Events
+
+Outcome variables can also be analyzed in terms of their overall counts, such as the number of deaths or hospitalizations in the sample.  The **count.events** method is used to calculate the number of rows in which a binary variable is set to TRUE:
+
+```{r }
+count.events(dat = simulated.chd, outcome.names = c("hospital", "death"), type = "overall")
+```
+
+This count can also be framed in terms of the **distinct** occurrences of an event.  When type = "distinct", the count.events method only adds to the count when an event is preceded by a gap in utilization.
+
+```{r }
+count.events(dat = simulated.chd, outcome.names = c("hospital", "death"), type = "distinct")
+```
+
+In particular, distinct counting reduces the count of hospitalizations substantially.  Some hospitalizations extend over a period encompassing multiple rows of observation.  (For instance, if the patient's medications are changed during the hospitalization, it would trigger the formation of an additional row in the panel without discharing the patient from the hospital.)  Hospitalizations in particular have costs associated with admission and separate costs based on the length of stay.  As an example, if one patient had an admission for 3 days and another for 5, the costs could be substantially different than a single admission that lasts for 8 days.
+
+The count.events method also allows for grouped calculations based on at least one categorical variable.  For instance, we could count the number of distinct hospitalizations and deaths in each geographic region:
+```{r }
+count.events(dat = simulated.chd, outcome.names = c("hospital", "death"), grouping.variables = "region", type = "distinct")
+```
+
+The count.events method can also produce counts for individual subjects when the identifier is used as a grouping variable:
+
+```{r }
+count.events(dat = simulated.chd, outcome.names = c("hospital", "death"), grouping.variables = "id", type = "distinct")
+```
+
+Likewise, we could also group the patients by their treatment status, such as examining the combinations of utilization of ace inhibitors and beta blockers at the time of an event:
+
+```{r }
+count.events(dat = simulated.chd, outcome.names = c("hospital", "death"), grouping.variables = c("ace", "bb"), type = "distinct")
+```
+
+## Crude Rates of Events
+
+Comparing groups in terms of their total events does not incorporate the degree of follow-up time.  If one patient is hospitalized once in 6 months of observation, and if a second patient is hospitalized once over the course of a year, then the first patient's rate of events per year could be estimated as double that of the second patient's rate.  The **crude.rates** method is designed to calculate the number of events divided by the amount of **person-time follow-up** (the total length of follow-up summed over the relevant patients).  Looking at the full simulated.chd data, the rates of distinct events of hospitalizations and mortality are:
+
+```{r }
+crude.rates(dat = simulated.chd, outcome.names = c("hospital", "death"), type = "distinct")
+```
+
+The rates would translate to roughly 0.0014 hospitalizations and 0.0002 deaths per person-day of followup.
+
+When interpreting these results, it can be helpful to recharacterize the period of time.  For instance, using 100 person-years of follow-up can place the rates onto a scale that is more similar to a human life span.  The crude.rates method implements this by specifying a time.multiplier:
+
+```{r }
+crude.rates(dat = simulated.chd, outcome.names = c("hospital", "death"), time.multiplier = 100 * 365.25)
+```
+
+These crude rates can then be grouped by categorical variables.  Here we compare the event rates for patients on and off of each medication:
+
+```{r }
+crude.rates(dat = simulated.chd, outcome.names = c("hospital", "death"), time.multiplier = 100 * 365.25, grouping.variables = "ace")
+
+crude.rates(dat = simulated.chd, outcome.names = c("hospital", "death"), time.multiplier = 100 * 365.25, grouping.variables = "bb")
+
+crude.rates(dat = simulated.chd, outcome.names = c("hospital", "death"), time.multiplier = 100 * 365.25, grouping.variables = "statin")
+```
+
+The ratio of these crude rates could be one estimate of the treatment effect, showing that patients who take these medications have lower rates of mortality and hospitalizations.  However, some caveats apply:  these crude rates may reflect confounding from other variables (measured or unmeasured) in observational studies.  Additionally, complex factors can be at play.  For instance, a patient with clear warning signs of an adverse event may be placed on these medications.  If the event occurs shortly thereafter, the data would dubiously show a harmful association between the medication and the event.  Without care in interpretation, we might falsely conclude that going to the hospital is the factor that creates the most hazard for mortality.
+
+The crude rates can also be calculated in different eras at time by specifying numeric cut.points:
+
+```{r }
+crude.rates(dat = simulated.chd, outcome.names = c("hospital", "death"), time.multiplier = 100 * 365.25, cut.points = c(90, 365/2))
+```
+
+These calculations can also be performed in groups, such as comparing patients on and off beta blockers in each era in terms of their rates of hospitalization and mortality:
+
+```{r }
+crude.rates(dat = simulated.chd, outcome.names = c("hospital", "death"), time.multiplier = 100 * 365.25, grouping.variables = "bb", cut.points = c(90, 365/2))
+```
+
+Panel data presents challenges for separating the data into eras of time.  Many rows of data may include intervals of time that overlap multiple eras.  The crude.rates method relies upon the **era.splits** method to restructure the data.  For rows that overlap the eras specified by the cut.points, the method adds new rows to the data set and modifies the time points of the existing rows.  This ensures that each row belongs to a single era and that no information is lost.  
+
+As an example, let's consider the first two rows of the simulated.chd data:
+
+```{r }
+simulated.chd[1:2, .SD, .SDcols = c("id", "t1", "t2")]
+```
+
+Suppose an analysis wants to consider the experience of patients in several periods:  a) before 3 days, b) at least 3 and less than 5 days, and c) all subsequent follow-up starting at 5 days.  Applying the era.splits method to these two rows of data splits the first row into 3 rows of data that are mutually exclusive, collectively exhaustive, and aligned with the specified eras:
+
+```{r }
+era.splits(dat = simulated.chd[1:2, .SD, .SDcols = c("id", "t1", "t2")], cut.points = c(3,5))
+```
+
+## Quality Checks of Panel Data
+
+The complexity and unfamiliarity of the panel structure can present challenges in basic investigations of the data.  The tvtools package includes a number of methods for identifying potential issues with panel data.
+
+### Measurement Rates
+
+Longitudinal data may be subject to censoring and loss of follow-up.  The measurement.rate function calculates the proportion of subjects who have records at the specified point in follow-up:
+
+```{r }
+measurement.rate(dat = simulated.chd, id.name = "id", t1.name = "t1", t2.name = "t2", time.point = 365)
+```
+
+Note that the rate not observed incorporates a) patients censored or lost to follow-up at that time, and also b) patients who did not survive to that time.
+
+The rate of measurement can also be calculated in groups:
+
+```{r }
+measurement.rate(dat = simulated.chd, id.name = "id", t1.name = "t1", t2.name = "t2", time.point = 365, grouping.variables = "region")
+```
+
+### Panel Gaps
+
+Longitudinal records can include periods of censorship.  In panel data, this would show up through the absence of a record.  The **panel.gaps** method is designed to identify gaps between earlier and later observed times, with an assumed starting time of t1 = 0.  Here we can verify no gaps in the simulated.chd data:
+
+```{r }
+pg.check = panel.gaps(dat = orig.data, id.name = "id", t1.name = "t1", t2.name = "t2")
+pg.check[, .N, gap_before]
+```
+
+We could also artificially construct gaps in the panel data by only selecting a subset of rows.  This will verify that the panel gaps are correctly identified:
+
+```{r }
+gap.dat <- simulated.chd[c(1,3,5, 7, 58, 60, 64),]
+pg.check.2 <- panel.gaps(dat = gap.dat, id.name = "id", t1.name = "t1", t2.name = "t2")
+pg.check.2[, .SD, .SDcols = c("id", "t1", "t2", "gap_before")]
+```
+
+We can also identify the earliest gap for each subject using **first.panel.gap**:
+
+```{r }
+first.panel.gap(dat = gap.dat, id.name = "id", t1.name = "t1", t2.name = "t2")
+```
+
+Likewise, a subject's latest gap can be found with **last.panel.gap**:
+
+```{r }
+last.panel.gap(dat = gap.dat, id.name = "id", t1.name = "t1", t2.name = "t2")
+```
+
+### Panel Overlaps
+
+For a single subject, we assume that the panel data is structured so that the rows and time intervals will be mutually exclusive.  That assumption can be validated only through investigation of the data.  The panel.overlaps function identifies whether each subject has any period of potentially overlapping time intervals:
+
+```{r }
+possible.overlaps <- panel.overlaps(dat = simulated.chd, id.name = "id", t1.name = "t1", t2.name = "t2")
+#print(possible.overlaps)
+possible.overlaps[, mean(overlapping_panels == F)]
+```
+
+This verifies that the simulated.chd meets the assumption of mutually exlusive periods of observation for each user.
+
+We can then construct a panel with overlapping observations:
+
+```{r , tidy = F}
+overlap.dat <- data.table(id = "ABC", t1 = c(0, 7, 14, 21), t2 = c(8, 15, 21, 30), ace = c(1,0,1,0))
+```
+
+```{r }
+panel.overlaps(dat = overlap.dat, id.name = "id", t1.name = "t1", t2.name = "t2")
+```
+
+It should be noted that panel.overlaps requires pairwise comparisons of the time intervals within each subject.  As a result, larger panels can require some computational time to complete the investigation of overlaps.
+
+## Events of Unusual Duration
+
+Panel data is structured on the notion that new events will take effect at the beginning of the time interval for the record.  This assumption should be carefully verified in data analyses.  For instance, one might erroneously code death at the end of the last interval of observation.  If the last interval is especially lengthy, an analysis of the data might systematically record the deaths at significantly earlier times than they occurred.  
+
+The **unusual.duration** method is designed to identify cases in which an event occurs and the duration of the interval is long enough to be considered unusual.  For instance, we might identify the hospitalizations that last longer than 100 days (in a single row):
+
+
+```{r }
+long.hospitalizations <- unusual.duration(dat = simulated.chd, outcome.name = "hospital", max.length = 100, t1.name = "t1", t2.name = "t2")
+long.hospitalizations[, .SD, .SDcols = c("id", "t1", "t2", "hospital")]
+```
+
+These cases might be further investigated to ensure the accuracy of the data.  Likewise, we could also verify that deaths are not recorded for a period greater than 1 day:
+
+```{r }
+unusual.duration(dat = simulated.chd, outcome.name = "death", max.length = 1, t1.name = "t1", t2.name = "t2")
+```
+
+This verifies that the time of mortality will not be misinterpreted based upon differences between the beginning and end of the interval of observation.  If large differences are noted, then some restructuring of the data may be necessary.
